@@ -1,0 +1,240 @@
+generator erd {
+  provider = "prisma-erd-generator"
+  theme    = "forest"
+  output   = "my_uml_diagram.svg"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id        Int    @id @default(autoincrement())
+  role_name String @db.VarChar(50)
+  users     User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                Int       @id @default(autoincrement())
+  first_name        String    @db.VarChar(50)
+  last_name         String    @db.VarChar(50)
+  email             String    @unique @db.VarChar(100)
+  phone_number      String    @db.VarChar(20)
+  password          String    @db.VarChar(255)
+  role_id           Int?
+  anchor_photo_path String?   @db.VarChar(255)
+  bio               String?   @db.Text
+  // Added 2FA fields from SQL Dump
+  two_fa_code       String?   @db.VarChar(6)
+  two_fa_expires_at DateTime?
+  two_fa_secret     String?   @db.VarChar(255)
+  two_fa_enabled    Boolean   @default(false) @db.TinyInt(1)
+  created_at        DateTime  @default(now()) @db.Timestamp()
+
+  role          Role?          @relation(fields: [role_id], references: [id])
+  jobs          Job[]          // Relation for Recruiters
+  applications  Application[]  // Relation for Candidates
+  exam_results  ExamResult[]
+  audit_logs    AuditLog[]
+  notifications Notification[]
+  skills        UserSkill[]
+
+  @@index([role_id], name: "role_id")
+  @@map("users")
+}
+
+model Job {
+  id             Int        @id @default(autoincrement())
+  recruiter_id   Int
+  title          String     @db.VarChar(255)
+  company        String     @db.VarChar(255)
+  location       String     @db.VarChar(255)
+  type           JobType
+  description    String     @db.Text
+  category       String     @db.VarChar(50)
+  status         JobStatus  @default(Active)
+  max_applicants Int        @default(50)
+  is_archived    Boolean    @default(false) @db.TinyInt(1)
+  created_at     DateTime   @default(now()) @db.Timestamp()
+
+  recruiter    User          @relation(fields: [recruiter_id], references: [id], onDelete: Cascade)
+  applications Application[]
+  exam         Exam?
+
+  @@index([recruiter_id], name: "fk_recruiter")
+  @@index([title, company], name: "idx_jobs_search")
+  @@index([type, category, location], name: "idx_jobs_filter")
+  @@map("jobs")
+}
+
+model Application {
+  id              Int               @id @default(autoincrement())
+  job_id          Int
+  user_id         Int
+  resume_path     String?           @db.VarChar(255)
+  ai_score        Int?              @default(0)
+  ai_summary      String?           @db.Text
+  status          ApplicationStatus @default(Applied)
+  applied_at      DateTime          @default(now()) @db.Timestamp()
+  recruiter_notes String?           @db.Text
+
+  job          Job          @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  audit_logs   AuditLog[]
+  exam_answers ExamAnswer[]
+
+  @@index([job_id], name: "job_id")
+  @@index([user_id], name: "user_id")
+  @@map("applications")
+}
+
+model Skill {
+  id    Int         @id @default(autoincrement())
+  name  String      @unique @db.VarChar(100)
+  users UserSkill[]
+
+  @@map("skills")
+}
+
+// SQL dump only reflects User <-> Skills junction
+model UserSkill {
+  user_id  Int
+  skill_id Int
+  user     User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  skill    Skill @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, skill_id])
+  @@index([skill_id], name: "idx_user_skill_lookup")
+  @@map("user_skills")
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  title      String   @db.VarChar(255)
+  message    String   @db.Text
+  is_read    Boolean  @default(false) @db.TinyInt(1)
+  created_at DateTime @default(now()) @db.Timestamp()
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], name: "user_id")
+  @@map("notifications")
+}
+
+model Exam {
+  id           Int          @id @default(autoincrement())
+  job_id       Int          @unique
+  title        String       @db.VarChar(255)
+  duration_min Int
+  passing_mark Int
+  questions    Question[]
+  results      ExamResult[]
+
+  job Job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@map("exams")
+}
+
+model Question {
+  id             Int          @id @default(autoincrement())
+  exam_id        Int
+  question_text  String       @db.Text
+  option_a       String       @db.VarChar(255)
+  option_b       String       @db.VarChar(255)
+  option_c       String       @db.VarChar(255)
+  option_d       String       @db.VarChar(255)
+  correct_answer String       @db.VarChar(1)
+
+  exam         Exam         @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+  exam_answers ExamAnswer[]
+
+  @@index([exam_id], name: "exam_id")
+  @@map("questions")
+}
+
+model ExamResult {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  exam_id      Int
+  score        Int
+  status       String   @db.VarChar(20)
+  attempted_at DateTime @default(now()) @db.Timestamp()
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  exam Exam @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], name: "user_id")
+  @@index([exam_id], name: "exam_id")
+  @@map("exam_results")
+}
+
+model ExamAnswer {
+  id              Int      @id @default(autoincrement())
+  application_id  Int
+  question_id     Int
+  selected_option String   @db.VarChar(1)
+  is_correct      Boolean  @db.TinyInt(1)
+  created_at      DateTime @default(now()) @db.Timestamp()
+
+  application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  question    Question    @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id], name: "application_id")
+  @@index([question_id], name: "question_id")
+  @@map("exam_answers")
+}
+
+model AuditLog {
+  id             Int      @id @default(autoincrement())
+  user_id        Int?
+  application_id Int?
+  action         String   @db.VarChar(255)
+  description    String   @db.Text
+  ip_address     String?  @db.VarChar(45)
+  created_at     DateTime @default(now()) @db.Timestamp()
+
+  user        User?        @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  application Application? @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id], name: "idx_audit_application")
+  @@index([user_id], name: "idx_audit_user")
+  @@index([action], name: "idx_audit_action")
+  @@index([created_at], name: "idx_audit_created_at")
+  @@map("audit_logs")
+}
+
+enum JobType {
+  Full_time @map("Full-time")
+  Part_time @map("Part-time")
+  Contract
+  Remote
+  On_site   @map("On-site")
+  Hybrid
+}
+
+enum JobStatus {
+  Active
+  Closed
+  Draft
+}
+
+enum ApplicationStatus {
+  Applied
+  Screened
+  Exam_Assigned  @map("Exam Assigned")
+  Exam_Completed @map("Exam Completed")
+  Passed
+  Failed
+  Interviewing
+  Offered
+  Rejected
+  Archived
+}

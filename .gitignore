@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment and Secrets
+.env
+config.php
+Database.php
+*.rar
+*.zip
+
+# OS/IDE Files
+.vscode/
+.DS_Store
+Thumbs.db
+
+#Files
+info.php
+package-lock.json
+package.json
+omitted/
+
+# Logs
+*.log

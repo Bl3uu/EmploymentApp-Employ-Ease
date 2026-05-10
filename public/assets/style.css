@@ -1,0 +1,14 @@
+/* Custom Dashboard Styles */
+.job-card:hover {
+    transform: translateY(-2px);
+    transition: all 0.2s ease-in-out;
+}
+
+.profile-avatar {
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+}
+
+/* Hide scrollbar for cleaner look if needed */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
