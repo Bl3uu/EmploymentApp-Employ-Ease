@@ -3,9 +3,6 @@ node_modules/
 vendor/
 
 # Environment and Secrets
-.env
-config.php
-Database.php
 *.rar
 *.zip
 
